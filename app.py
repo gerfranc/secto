@@ -25,6 +25,9 @@ import geopandas as gpd
 
 from streamlit_folium import st_folium
 
+# Configurar la página para un diseño más ancho
+st.set_page_config(layout="wide")
+
 # Título de la aplicación
 st.title("Sectorizador - Zonas comunes")
 
@@ -37,8 +40,16 @@ if uploaded_file is not None:
     st.subheader("Datos de Celdas")
     st.write(celdas)
 
-    # Mostrar las columnas del DataFrame
-    #st.write("Columnas del DataFrame:", celdas.columns.tolist())
+    # Verificar si hay valores nulos en las columnas clave
+    columnas_necesarias = ['Latitud', 'Longitud', 'Radio_de_cobertura', 'Azimuth', 'Angulo', 'Abonado', 'fecha']
+    for columna in columnas_necesarias:
+        if columna not in celdas.columns:
+            st.error(f"La columna '{columna}' no se encuentra en el DataFrame. Por favor, verifica el archivo CSV.")
+            st.stop()
+
+    if celdas[['Latitud', 'Longitud', 'Radio_de_cobertura', 'Azimuth', 'Angulo']].isnull().any().any():
+        st.error("Hay valores nulos en las columnas necesarias. Por favor, verifica los datos.")
+        st.stop()
 
     # Crear un mapa centrado en los puntos del dataframe
     mapa = folium.Map(location=[celdas['Latitud'].mean(), celdas['Longitud'].mean()], zoom_start=13)
@@ -67,22 +78,28 @@ if uploaded_file is not None:
         color = colores[index % len(colores)]
 
         # Crear el polígono que representa el sector circular y añadirlo a la lista de polígonos
-        poligono = Polygon(puntos)
-        poligonos.append((poligono, row['Abonado'], color))
+        try:
+            poligono = Polygon(puntos)
+            poligonos.append((poligono, row['Abonado'], color))
 
-        # Añadir el polígono al mapa
-        folium.vector_layers.Polygon(locations=puntos, tooltip=row['Abonado'], color=color, fill=True, fill_color=color, fill_opacity=0.4).add_to(mapa)
+            # Añadir el polígono al mapa
+            folium.vector_layers.Polygon(locations=puntos, tooltip=row['Abonado'], color=color, fill=True, fill_color=color, fill_opacity=0.4).add_to(mapa)
+        except ValueError as e:
+            st.warning(f"No se pudo crear el polígono para la fila {index} debido a: {e}")
 
-    # Mostrar el mapa en Streamlit
+    # Mostrar el mapa en Streamlit con dimensiones ajustadas
     st.subheader("Mapa de Celdas")
-    st_data = st_folium(mapa, width=700, height=500)
+    st_data = st_folium(mapa, width=800, height=400)  # Ajusta 'width' y 'height' para reducir el espacio vacío
+
+    # Reducir el espacio entre el mapa y el análisis de zonas comunes
+    st.markdown("""
+        <style>
+        .stDataFrame {margin-top: -30px;}
+        </style>
+        """, unsafe_allow_html=True)
 
     # Convertir la columna 'fecha' a tipo datetime
-    if 'fecha' in celdas.columns:
-        celdas['fecha'] = pd.to_datetime(celdas['fecha'], errors='coerce')
-    else:
-        st.error("La columna 'fecha' no se encuentra en el DataFrame. Por favor, verifica el archivo CSV.")
-        st.stop()
+    celdas['fecha'] = pd.to_datetime(celdas['fecha'], errors='coerce')
 
     # Análisis de zonas comunes
     st.subheader("Análisis de Zonas Comunes")
@@ -101,3 +118,4 @@ if uploaded_file is not None:
                         st.write(f"Los abonados **{abonado_i}** y **{abonado_j}** activaron celdas con zonas de cobertura que presentan una intersección. Dicho solapamiento se establece en el periodo comprendido entre {hora_i.strftime('%d-%m-%Y %H:%M:%S')} - {hora_j.strftime('%d-%m-%Y %H:%M:%S')}.")
                 else:
                     st.warning(f"Fechas no válidas para los abonados {abonado_i} y {abonado_j}.")
+
