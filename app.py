@@ -5,28 +5,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import folium
-import geopy
-
-from folium.features import DivIcon
-from folium.plugins import MarkerCluster
-
-from geopy.distance import geodesic
-from geopy.distance import distance
-from geopy.geocoders import Nominatim
 
 from math import sin, cos, radians
-
-from datetime import datetime, timedelta
-
-from shapely.geometry import Point
+from datetime import timedelta
 from shapely.geometry.polygon import Polygon
-
-import geopandas as gpd
-
 from streamlit_folium import st_folium
-
-# Configurar la página para un diseño más ancho
-st.set_page_config(layout="wide")
 
 # Título de la aplicación
 st.title("Sectorizador - Zonas comunes")
@@ -34,11 +17,12 @@ st.title("Sectorizador - Zonas comunes")
 # Subir archivo CSV
 uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
 
+# Slider para seleccionar el intervalo de tiempo en minutos
+selected_minutes = st.selectbox("Seleccione el intervalo de tiempo en minutos", [1, 15, 30, 60], index=1)
+
 if uploaded_file is not None:
     # Leer el archivo CSV
     celdas = pd.read_csv(uploaded_file)
-    st.subheader("Datos de Celdas")
-    st.write(celdas)
 
     # Verificar si hay valores nulos en las columnas clave
     columnas_necesarias = ['Latitud', 'Longitud', 'Radio_de_cobertura', 'Azimuth', 'Angulo', 'Abonado', 'fecha']
@@ -89,7 +73,7 @@ if uploaded_file is not None:
 
     # Mostrar el mapa en Streamlit con dimensiones ajustadas
     st.subheader("Mapa de Celdas")
-    st_data = st_folium(mapa, width=800, height=400)  # Ajusta 'width' y 'height' para reducir el espacio vacío
+    st_data = st_folium(mapa, width=800, height=400)
 
     # Reducir el espacio entre el mapa y el análisis de zonas comunes
     st.markdown("""
@@ -114,7 +98,7 @@ if uploaded_file is not None:
 
                 # Verificar que las horas no sean NaT (Not a Time)
                 if pd.notnull(hora_i) and pd.notnull(hora_j):
-                    if (poligono_i[0].intersects(poligono_j[0])) and (abs(hora_i - hora_j) < timedelta(minutes=15)) and (abonado_i != abonado_j):
+                    if (poligono_i[0].intersects(poligono_j[0])) and (abs(hora_i - hora_j) < timedelta(minutes=selected_minutes)) and (abonado_i != abonado_j):
                         st.write(f"Los abonados **{abonado_i}** y **{abonado_j}** activaron celdas con zonas de cobertura que presentan una intersección. Dicho solapamiento se establece en el periodo comprendido entre {hora_i.strftime('%d-%m-%Y %H:%M:%S')} - {hora_j.strftime('%d-%m-%Y %H:%M:%S')}.")
                 else:
                     st.warning(f"Fechas no válidas para los abonados {abonado_i} y {abonado_j}.")
